@@ -1,0 +1,316 @@
+# Esercises (in class)
+# WiFi
+Nicla Sense ME
+```C
+#include "Arduino.h"
+#include "Arduino_BHY2.h"
+
+void setup() {
+  BHY2.begin(NICLA_I2C, NICLA_VIA_ESLOV);
+}
+
+void loop() {
+ BHY2.update(100);
+}
+```
+MRK WiFi1010
+```C
+#define BRIGHTNESS_PIN A2
+
+#include <Arduino.h>
+#include <WiFiNINA.h>
+#include <WiFiSSLClient.h>
+#include "Arduino_BHY2Host.h"
+
+#include "arduino_secrets.h" // Include your WiFi credentials 
+
+char ssid[] = SECRET_SSID;
+char pass[] = SECRET_PASS;
+
+WiFiSSLClient client;
+Sensor temp(SENSOR_ID_TEMP); // Embedded temperature sensor
+
+void setup() 
+{
+  Serial.begin(9600);
+  while (!Serial);
+
+  while (WiFi.begin(ssid, pass) != WL_CONNECTED) 
+  {
+    Serial.print("Attempting to connect to network: ");
+    Serial.println(ssid);
+    delay(5000);
+  }
+
+  Serial.println("Connected to WiFi");
+  pinMode(BRIGHTNESS_PIN, INPUT);
+  
+  Serial.println("Initializing Nicla Sense ME...");
+  BHY2Host.begin(false, NICLA_VIA_ESLOV);
+  temp.begin();
+  
+  Serial.println("Setup complete");
+}
+
+void loop() 
+{
+  BHY2Host.update();
+
+  // Read temperature and brightness
+  float temperature = temp.value();
+  float brightness = analogRead(BRIGHTNESS_PIN);
+  
+  // Print the results
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" °C, Brightness: ");
+  Serial.print(brightness);
+  Serial.println(" (raw value)");
+
+  delay(1000); // Delay for readability
+}
+
+```
+App
+```
+var sheet_id = '1wMTrjOsT5UE6y1AcPTZbzFR7cuWaUzMznBB9wm65VNg';
+var sheet_name = 'MORPHEUS_prova2';
+
+function doGet(e) {
+  var ss = SpreadsheetApp.openById(sheet_id);
+  var sheet = ss.getSheetByName(sheet_name);
+  
+  // Raccoglie solo temperatura e luminosità
+  var t1 = e.parameter.t1;
+  var l1 = e.parameter.l1;
+  
+  var t2 = e.parameter.t2;
+  var l2 = e.parameter.l2;
+
+  var t3 = e.parameter.t3;
+  var l3 = e.parameter.l3;
+
+  var t4 = e.parameter.t4;
+  var l4 = e.parameter.l4;
+
+  var t5 = e.parameter.t5;
+  var l5 = e.parameter.l5;
+
+  var t6 = e.parameter.t6;
+  var l6 = e.parameter.l6;
+
+  var t7 = e.parameter.t7;
+  var l7 = e.parameter.l7;
+
+  var t8 = e.parameter.t8;
+  var l8 = e.parameter.l8;
+
+  var t9 = e.parameter.t9;
+  var l9 = e.parameter.l9;
+
+  var t10 = e.parameter.t10;
+  var l10 = e.parameter.l10;
+
+  // Inserisce solo dati di temperatura e luminosità nel foglio
+  sheet.appendRow([new Date(), t1, l1]);
+  sheet.appendRow([new Date(), t2, l2]);
+  sheet.appendRow([new Date(), t3, l3]);
+  sheet.appendRow([new Date(), t4, l4]);
+  sheet.appendRow([new Date(), t5, l5]);
+  sheet.appendRow([new Date(), t6, l6]);
+  sheet.appendRow([new Date(), t7, l7]);
+  sheet.appendRow([new Date(), t8, l8]);
+  sheet.appendRow([new Date(), t9, l9]);
+  sheet.appendRow([new Date(), t10, l10]);
+ 
+  return ContentService.createTextOutput("Data received successfully");
+}
+```
+# Power Saving Mode
+Practical example that puts the Nicla Sense ME in sleep mode between readings, activating the temperature sensor every 5 minutes.
+
+```C
+#include <Arduino_LSM9DS1.h> // Libreria per sensore di temperatura e movimento
+#include <Arduino_LowPower.h> // Libreria per modalità di basso consumo
+
+void setup() {
+  Serial.begin(9600);
+
+  // Inizializza il sensore (ad esempio LSM9DS1 per temperatura)
+  if (!IMU.begin()) {
+    Serial.println("Errore nell'inizializzazione del sensore!");
+    while (1);
+  }
+  Serial.println("Sensore inizializzato correttamente.");
+}
+
+void loop() {
+  // Attiva il sensore per leggere la temperatura
+  float temperature;
+  if (IMU.temperatureAvailable()) {
+    temperature = IMU.readTemperature();
+    Serial.print("Temperatura: ");
+    Serial.print(temperature);
+    Serial.println(" °C");
+  }
+  
+  // Manda la scheda in sleep per risparmiare energia
+  Serial.println("Modalità sleep per 5 minuti...");
+  LowPower.sleep(300000); // 300000 ms = 5 minuti
+
+  // Il codice riprenderà qui dopo lo sleep
+}
+
+```
+# Adding a simple classifier
+Main code
+```C
+#include <Wire.h>  // Per la comunicazione I2C
+#include "model.h"  // Include il classificatore avanzato
+
+float temperature_data = 0.0f;  // Dato della temperatura letto dalla Nicla
+
+void setup() {
+  Serial.begin(115200);  // Avvia la comunicazione seriale
+  Wire.begin();  // Inizializza la comunicazione I2C
+
+  Serial.println("Inizializzazione completa.");
+}
+
+void loop() {
+  // Supponiamo di ricevere la temperatura dalla Nicla tramite I2C
+  Wire.requestFrom(0x29, sizeof(temperature_data));  // Richiedi dati dalla Nicla
+
+  if (Wire.available()) {
+    Wire.readBytes((byte*)&temperature_data, sizeof(temperature_data));  // Leggi la temperatura
+    Serial.print("Temperatura ricevuta: ");
+    Serial.println(temperature_data);
+
+    // Passa la temperatura al classificatore
+    int result = simple_classifier(temperature_data);
+
+    // Mostra il risultato
+    if (result == 1) {
+      Serial.println("Temperatura fuori dal range.");
+    } else {
+      Serial.println("Temperatura nel range.");
+    }
+  }
+
+  delay(1000);  // Aspetta 1 secondo prima di ripetere
+}
+
+```
+model.h
+```C
+// model.h
+#ifndef MODEL_H
+#define MODEL_H
+
+// Funzione che implementa il classificatore semplice
+int simple_classifier(float current_temp) {
+    // Limiti di temperatura (modificabili)
+    const float lower_limit = 20.0;  // Soglia inferiore del range
+    const float upper_limit = 30.0;  // Soglia superiore del range
+
+    if (current_temp < lower_limit || current_temp > upper_limit) {
+        return 1;  // Fuori dal range
+    } else {
+        return 0;  // OK
+    }
+}
+
+#endif
+```
+
+# Adding a ML model
+```
+import numpy as np
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# Genera un dataset fittizio di temperature (esempio)
+# Dati simulati di temperatura (in gradi Celsius)
+temperature_data = np.random.normal(loc=25, scale=5, size=(1000, 1))  # 1000 dati con media 25°C e deviazione standard di 5°C
+
+# Etichette: 0 = "OK" (dentro il range), 1 = "OUT_OF_RANGE" (fuori dal range)
+labels = (temperature_data < 20) | (temperature_data > 30)  # fuori dal range 20-30°C
+labels = labels.astype(int)  # converte True/False in 1/0
+
+# Normalizza i dati
+scaler = StandardScaler()
+temperature_data_scaled = scaler.fit_transform(temperature_data)
+
+# Suddividi il dataset in addestramento e test
+X_train, X_test, y_train, y_test = train_test_split(temperature_data_scaled, labels, test_size=0.2, random_state=42)
+
+# Crea il modello di rete neurale
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(16, activation='relu', input_dim=1),
+    tf.keras.layers.Dense(8, activation='relu'),
+    tf.keras.layers.Dense(1, activation='sigmoid')
+])
+
+# Compila il modello
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Allena il modello
+model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
+
+# Salva il modello in formato .keras
+model.save('temperature_classifier.keras')
+
+# Applicare la quantizzazione durante la conversione in TensorFlow Lite
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+# Salva il modello TFLite
+with open('temperature_classifier_quantized.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+from google.colab import files
+
+# Scarica il modello .tflite
+files.download('temperature_classifier_quantized.tflite')
+
+```
+```
+def convert_tflite_to_header(input_file, output_file):
+    """
+    Convert a .tflite file to a .h file for use in microcontroller projects.
+    
+    Args:
+        input_file (str): Path to the .tflite file.
+        output_file (str): Path to the output .h file.
+    """
+    with open(input_file, "rb") as f:
+        data = f.read()
+
+    with open(output_file, "w") as f:
+        f.write("// This file was generated from a TensorFlow Lite model\n")
+        f.write("// Do not modify it manually\n\n")
+        f.write(f"#ifndef {output_file.split('.')[0].upper()}_H\n")
+        f.write(f"#define {output_file.split('.')[0].upper()}_H\n\n")
+        f.write("const unsigned char model[] = {\n")
+        
+        # Write data in hex format
+        for i, byte in enumerate(data):
+            if i % 12 == 0:
+                f.write("    ")
+            f.write(f"0x{byte:02x}, ")
+            if (i + 1) % 12 == 0:
+                f.write("\n")
+        
+        # Handle trailing comma and newline
+        if len(data) % 12 != 0:
+            f.write("\n")
+        
+        f.write("};\n\n")
+        f.write(f"const unsigned int model_data_len = {len(data)};\n\n")
+        f.write(f"#endif  // {output_file.split('.')[0].upper()}_H\n")
+
+# Example usage
+convert_tflite_to_header('classifier.tflite', 'model.h')
+```
